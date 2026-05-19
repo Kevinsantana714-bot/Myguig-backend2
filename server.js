@@ -32,6 +32,13 @@ app.use('/api',               messagesRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
+// Captura todos os erros não tratados e devolve JSON (evita páginas HTML 500)
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('[global error handler]', err.message || err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+});
+
 init().then(seed).then(() => {
   app.listen(PORT, () => {
     console.log(`\nMyGUIg backend rodando em http://localhost:${PORT}`);
