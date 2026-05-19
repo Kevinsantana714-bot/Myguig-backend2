@@ -75,6 +75,8 @@ async function init() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS instagram    VARCHAR(100)`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cache_minimo NUMERIC(10,2) NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cidade       VARCHAR(100)`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url   TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone        VARCHAR(30)`);
 
   console.log('DB inicializado — tabelas OK');
 }
