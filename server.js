@@ -10,6 +10,7 @@ const musiciansRoutes    = require('./routes/musicians');
 const usersRoutes        = require('./routes/users');
 const sendProposalRoutes = require('./routes/send_proposal');
 const messagesRoutes     = require('./routes/messages');
+const eventsRoutes       = require('./routes/events');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/musicians',     musiciansRoutes);
 app.use('/api/users',         usersRoutes);
 app.use('/api',               messagesRoutes);
+app.use('/api/events',        eventsRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 

@@ -78,6 +78,22 @@ async function init() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url   TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone        VARCHAR(30)`);
 
+  // Eventos manuais da agenda (sincronizados entre dispositivos)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS manual_events (
+      id          SERIAL        PRIMARY KEY,
+      user_id     INTEGER       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title       VARCHAR(255)  NOT NULL,
+      date        DATE          NOT NULL,
+      time_start  VARCHAR(10),
+      time_end    VARCHAR(10),
+      location    VARCHAR(255),
+      value       DECIMAL(10,2) NOT NULL DEFAULT 0,
+      description TEXT,
+      created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+    )
+  `);
+
   console.log('DB inicializado — tabelas OK');
 }
 
