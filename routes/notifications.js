@@ -46,4 +46,23 @@ router.patch('/:id/read', requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/notifications/:id
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const id  = parseInt(req.params.id);
+    const uid = req.userId;
+
+    const { rows: [notif] } = await pool.query(
+      'SELECT id FROM notifications WHERE id = $1 AND user_id = $2',
+      [id, uid]
+    );
+    if (!notif) return res.status(404).json({ error: 'Notificação não encontrada.' });
+
+    await pool.query('DELETE FROM notifications WHERE id = $1', [id]);
+    res.status(204).send();
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
