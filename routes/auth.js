@@ -63,7 +63,7 @@ router.post('/logout', requireAuth, (_req, res) => res.json({ ok: true }));
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade FROM users WHERE id = $1',
+      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado.' });
@@ -77,7 +77,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // PUT /auth/profile
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    const { name, bio, estilos, instagram, cache_minimo, cidade } = req.body || {};
+    const { name, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone } = req.body || {};
 
     const { rows } = await pool.query(
       `UPDATE users
@@ -86,9 +86,11 @@ router.put('/profile', requireAuth, async (req, res) => {
              estilos      = COALESCE($3, estilos),
              instagram    = COALESCE($4, instagram),
              cache_minimo = COALESCE($5, cache_minimo),
-             cidade       = COALESCE($6, cidade)
+             cidade       = COALESCE($6, cidade),
+             avatar_url   = COALESCE($8, avatar_url),
+             phone        = COALESCE($9, phone)
          WHERE id = $7
-         RETURNING id, name, email, role, bio, estilos, instagram, cache_minimo, cidade`,
+         RETURNING id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone`,
       [
         name      ? name.trim()                   : null,
         bio       ? bio.trim()                    : null,
@@ -97,6 +99,8 @@ router.put('/profile', requireAuth, async (req, res) => {
         cache_minimo != null ? parseFloat(cache_minimo) : null,
         cidade    ? cidade.trim()                 : null,
         req.userId,
+        avatar_url ? avatar_url.trim()            : null,
+        phone      ? phone.trim()                 : null,
       ]
     );
 

@@ -13,6 +13,7 @@ function parseMusician(row) {
     instagram:    row.instagram || '',
     cache_minimo: parseFloat(row.cache_minimo || 0).toFixed(2),
     cidade:       row.cidade || '',
+    avatar_url:   row.avatar_url || null,
   };
 }
 
@@ -49,7 +50,7 @@ router.get('/', requireAuth, async (req, res) => {
       params
     );
     const rowsRes = await pool.query(
-      `SELECT id, name, bio, estilos, instagram, cache_minimo, cidade
+      `SELECT id, name, bio, estilos, instagram, cache_minimo, cidade, avatar_url
          FROM users WHERE ${where}
          ORDER BY name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
