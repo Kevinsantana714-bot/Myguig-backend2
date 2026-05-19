@@ -138,4 +138,29 @@ router.post('/conversations/:id/messages', requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/conversations/:id
+// Apaga a conversa e todas as suas mensagens.
+// Só participante da conversa pode apagar.
+router.delete('/conversations/:id', requireAuth, async (req, res) => {
+  try {
+    const conv_id = parseInt(req.params.id);
+    const uid     = req.userId;
+
+    const { rows: [conv] } = await pool.query(
+      'SELECT * FROM conversations WHERE id = $1',
+      [conv_id]
+    );
+    if (!conv) return res.status(404).json({ error: 'Conversa não encontrada.' });
+    if (conv.user_a_id !== uid && conv.user_b_id !== uid)
+      return res.status(403).json({ error: 'Sem permissão para apagar esta conversa.' });
+
+    await pool.query('DELETE FROM messages      WHERE conversation_id = $1', [conv_id]);
+    await pool.query('DELETE FROM conversations WHERE id = $1',              [conv_id]);
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
