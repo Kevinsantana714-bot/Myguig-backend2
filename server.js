@@ -32,6 +32,23 @@ app.use('/api',               messagesRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
+// Diagnóstico temporário — confirma se as credenciais Cloudinary estão no ambiente
+app.get('/health/cloudinary', async (_, res) => {
+  try {
+    const cloudinary = require('./config/cloudinary');
+    const result = await cloudinary.api.ping();
+    res.json({ ok: true, result });
+  } catch (e) {
+    res.status(500).json({
+      ok: false,
+      error:      e.message || String(e),
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'MISSING',
+      api_key:    process.env.CLOUDINARY_API_KEY    ? 'SET' : 'MISSING',
+      api_secret: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'MISSING',
+    });
+  }
+});
+
 // Captura todos os erros não tratados e devolve JSON (evita páginas HTML 500)
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
