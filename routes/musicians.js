@@ -27,8 +27,9 @@ router.get('/', requireAuth, async (req, res) => {
     const style  = (req.query.style  || '').trim();
     const cidade = (req.query.cidade || '').trim();
 
-    const conditions = [`role = 'musician'`];
-    const params     = [];
+    // Exclui sempre o próprio utilizador autenticado dos resultados
+    const conditions = [`role = 'musician'`, `id != $1`];
+    const params     = [req.userId];
 
     if (search) {
       params.push(`%${search}%`);
