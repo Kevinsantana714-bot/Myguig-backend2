@@ -7,11 +7,23 @@ const router = express.Router();
 
 // POST /api/users/avatar  — upload de foto para Cloudinary (autenticado)
 // IMPORTANTE: deve vir antes de GET /:id para não ser capturado como id='avatar'
-router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
+router.post('/avatar', requireAuth, (req, res, next) => {
+  // Wrapping multer para que erros (Cloudinary, formato inválido, etc.)
+  // sejam devolvidos como JSON em vez do HTML padrão do Express
+  upload.single('avatar')(req, res, (err) => {
+    if (err) {
+      console.error('[avatar upload] multer/cloudinary error:', err);
+      return res.status(500).json({ error: err.message || 'Erro no upload de imagem.' });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhum ficheiro enviado.' });
 
-    const avatar_url = req.file.path; // URL pública do Cloudinary
+    // multer-storage-cloudinary v4 coloca a URL pública em req.file.path
+    const avatar_url = req.file.path;
+    console.log('[avatar upload] cloudinary url:', avatar_url);
 
     await pool.query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2',
@@ -20,6 +32,7 @@ router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) =>
 
     res.json({ avatar_url });
   } catch (e) {
+    console.error('[avatar upload] db error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
