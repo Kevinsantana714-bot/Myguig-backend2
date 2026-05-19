@@ -1,7 +1,28 @@
-const express = require('express');
-const { pool } = require('../db');
+const express        = require('express');
+const { pool }       = require('../db');
+const { requireAuth} = require('../middleware/auth');
+const upload         = require('../config/upload');
 
 const router = express.Router();
+
+// POST /api/users/avatar  — upload de foto para Cloudinary (autenticado)
+// IMPORTANTE: deve vir antes de GET /:id para não ser capturado como id='avatar'
+router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Nenhum ficheiro enviado.' });
+
+    const avatar_url = req.file.path; // URL pública do Cloudinary
+
+    await pool.query(
+      'UPDATE users SET avatar_url = $1 WHERE id = $2',
+      [avatar_url, req.userId]
+    );
+
+    res.json({ avatar_url });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // GET /api/users/:id  — perfil público (sem autenticação)
 router.get('/:id', async (req, res) => {
@@ -27,16 +48,16 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       user: {
-        id:             u.id,
-        name:           u.name,
-        role:           u.role,
-        bio:            u.bio || '',
-        estilos:        JSON.parse(u.estilos || '[]'),
-        instagram:      u.instagram || '',
-        cache_minimo:   parseFloat(u.cache_minimo || 0).toFixed(2),
-        cidade:         u.cidade || '',
-        avatar_url:     u.avatar_url || null,
-        phone:          u.phone || '',
+        id:              u.id,
+        name:            u.name,
+        role:            u.role,
+        bio:             u.bio || '',
+        estilos:         JSON.parse(u.estilos || '[]'),
+        instagram:       u.instagram || '',
+        cache_minimo:    parseFloat(u.cache_minimo || 0).toFixed(2),
+        cidade:          u.cidade || '',
+        avatar_url:      u.avatar_url || null,
+        phone:           u.phone || '',
         shows_confirmed: count,
       }
     });
