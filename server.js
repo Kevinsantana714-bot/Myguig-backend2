@@ -8,6 +8,7 @@ const proposalsRoutes    = require('./routes/proposals');
 const notificationsRoutes = require('./routes/notifications');
 const musiciansRoutes    = require('./routes/musicians');
 const sendProposalRoutes = require('./routes/send_proposal');
+const messagesRoutes     = require('./routes/messages');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +26,7 @@ app.use('/api/proposals',     proposalsRoutes);
 app.use('/api/proposals',     sendProposalRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/musicians',     musiciansRoutes);
+app.use('/api',               messagesRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 

@@ -33,6 +33,68 @@ async function normalize(row) {
   };
 }
 
+// POST /api/proposals  (contratante envia proposta a músico)
+router.post('/', requireAuth, async (req, res) => {
+  try {
+    const {
+      musician_id, evento, data_iso, local, cache,
+      horario_inicio, estilos, repertorio, metodo, descricao,
+    } = req.body || {};
+
+    if (!musician_id || !evento || !data_iso || !local || cache == null)
+      return res.status(400).json({ error: 'musician_id, evento, data_iso, local e cache são obrigatórios.' });
+
+    const contractor_id = req.userId;
+
+    // 1. Inserir proposta
+    const { rows: [prop] } = await pool.query(
+      `INSERT INTO proposals
+         (contractor_id, musician_id, evento, data_iso, horario_inicio,
+          local, cache, estilos, repertorio, metodo, descricao)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+      [
+        contractor_id, parseInt(musician_id), evento, data_iso,
+        horario_inicio || null, local, parseFloat(cache),
+        JSON.stringify(estilos || []),
+        repertorio || null, metodo || null, descricao || null,
+      ]
+    );
+    const proposal_id = prop.id;
+
+    // 2. Notificação para o músico
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1,$2)',
+      [parseInt(musician_id), `Nova proposta recebida: ${evento}`]
+    );
+
+    // 3. Conversa (só se não existir para esta proposta)
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM conversations WHERE proposal_id = $1', [proposal_id]
+    );
+    let conversation_id;
+    if (existing.length) {
+      conversation_id = existing[0].id;
+    } else {
+      const { rows: [conv] } = await pool.query(
+        'INSERT INTO conversations (user_a_id, user_b_id, proposal_id) VALUES ($1,$2,$3) RETURNING id',
+        [contractor_id, parseInt(musician_id), proposal_id]
+      );
+      conversation_id = conv.id;
+
+      // 4. Primeira mensagem automática
+      await pool.query(
+        'INSERT INTO messages (conversation_id, sender_id, body) VALUES ($1,$2,$3)',
+        [conversation_id, contractor_id,
+         `📋 Proposta enviada: ${evento} em ${data_iso}. Cachê: R$ ${parseFloat(cache).toFixed(2)}`]
+      );
+    }
+
+    res.status(201).json({ ok: true, proposal_id, conversation_id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/proposals
 router.get('/', requireAuth, async (req, res) => {
   try {
