@@ -8,13 +8,17 @@ const router = express.Router();
 // POST /api/users/avatar  — upload de foto para Cloudinary (autenticado)
 // IMPORTANTE: deve vir antes de GET /:id para não ser capturado como id='avatar'
 router.post('/avatar', requireAuth, (req, res, next) => {
+  // Verificação antecipada das credenciais Cloudinary
+  if (!process.env.CLOUDINARY_CLOUD_NAME) {
+    return res.status(503).json({ error: 'Serviço de upload não configurado. Contacte o administrador.' });
+  }
   // Wrapping multer para que erros (Cloudinary, formato inválido, etc.)
   // sejam devolvidos como JSON em vez do HTML padrão do Express
   upload.single('avatar')(req, res, (err) => {
     if (err) {
       const msg = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
       console.error('[avatar upload] multer/cloudinary error:', msg, err);
-      return res.status(500).json({ error: msg });
+      return res.status(500).json({ error: msg || 'Erro no upload. Verifica as credenciais Cloudinary.' });
     }
     next();
   });
