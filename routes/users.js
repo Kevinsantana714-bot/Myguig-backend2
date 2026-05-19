@@ -12,8 +12,9 @@ router.post('/avatar', requireAuth, (req, res, next) => {
   // sejam devolvidos como JSON em vez do HTML padrão do Express
   upload.single('avatar')(req, res, (err) => {
     if (err) {
-      console.error('[avatar upload] multer/cloudinary error:', err);
-      return res.status(500).json({ error: err.message || 'Erro no upload de imagem.' });
+      const msg = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      console.error('[avatar upload] multer/cloudinary error:', msg, err);
+      return res.status(500).json({ error: msg });
     }
     next();
   });
