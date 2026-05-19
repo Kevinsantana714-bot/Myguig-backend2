@@ -184,27 +184,54 @@ router.patch('/:id/cancel', requireAuth, async (req, res) => {
     const id  = parseInt(req.params.id);
     const uid = req.userId;
 
+    console.log(`[cancel] proposal_id=${id} uid=${uid}`);
+
+    // 1. Busca a proposta
     const { rows: [prop] } = await pool.query(
-      'SELECT p.*, u.name AS musician_name FROM proposals p JOIN users u ON u.id = p.musician_id WHERE p.id = $1',
+      'SELECT id, contractor_id, musician_id, evento, data_iso FROM proposals WHERE id = $1',
       [id]
     );
+    console.log('[cancel] prop =', prop);
+
     if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
     if (prop.musician_id !== uid)
       return res.status(403).json({ error: 'Sem permissão para cancelar esta proposta.' });
 
+    // 2. Busca o nome do músico
+    const { rows: [musician] } = await pool.query(
+      'SELECT name FROM users WHERE id = $1',
+      [prop.musician_id]
+    );
+    console.log('[cancel] musician =', musician);
+
+    const musicianName = musician ? musician.name : 'Músico';
+
+    // data_iso pode chegar como Date object — converte para string YYYY-MM-DD
+    const dataStr = prop.data_iso
+      ? (prop.data_iso instanceof Date
+          ? prop.data_iso.toISOString().slice(0, 10)
+          : String(prop.data_iso).slice(0, 10))
+      : '';
+
+    // 3. Cria notificação para o contratante
+    const msg = `O músico ${musicianName} cancelou o compromisso: ${prop.evento} em ${dataStr}`;
+    console.log(`[cancel] notificação → user_id=${prop.contractor_id} msg="${msg}"`);
+
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+      [prop.contractor_id, msg]
+    );
+
+    // 4. Atualiza status para cancelled
     await pool.query(
       "UPDATE proposals SET status = 'cancelled', updated_at = NOW() WHERE id = $1",
       [id]
     );
 
-    const msg = `O músico ${prop.musician_name} cancelou o compromisso: ${prop.evento} em ${prop.data_iso}`;
-    await pool.query(
-      'INSERT INTO notifications (user_id, message) VALUES ($1,$2)',
-      [prop.contractor_id, msg]
-    );
-
+    console.log(`[cancel] proposta ${id} marcada como cancelled`);
     res.json({ ok: true });
   } catch (e) {
+    console.error('[cancel] erro:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
