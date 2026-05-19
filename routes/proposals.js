@@ -177,4 +177,36 @@ router.post('/:id/counter', requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/proposals/:id/cancel
+// Músico cancela um compromisso e notifica o contratante.
+router.patch('/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    const id  = parseInt(req.params.id);
+    const uid = req.userId;
+
+    const { rows: [prop] } = await pool.query(
+      'SELECT p.*, u.name AS musician_name FROM proposals p JOIN users u ON u.id = p.musician_id WHERE p.id = $1',
+      [id]
+    );
+    if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
+    if (prop.musician_id !== uid)
+      return res.status(403).json({ error: 'Sem permissão para cancelar esta proposta.' });
+
+    await pool.query(
+      "UPDATE proposals SET status = 'cancelled', updated_at = NOW() WHERE id = $1",
+      [id]
+    );
+
+    const msg = `O músico ${prop.musician_name} cancelou o compromisso: ${prop.evento} em ${prop.data_iso}`;
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1,$2)',
+      [prop.contractor_id, msg]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
