@@ -116,8 +116,6 @@ router.get('/', requireAuth, async (req, res) => {
     const uid    = req.userId;
     const offset = (page - 1) * limit;
 
-    console.log(`[GET /proposals] uid=${uid} status=${status||'all'} page=${page}`);
-
     // Retorna propostas onde o utilizador é músico OU contratante
     let totalRes, rowsRes;
     if (status && status !== 'all') {
@@ -139,12 +137,6 @@ router.get('/', requireAuth, async (req, res) => {
         [uid, limit, offset]
       );
     }
-
-    console.log(`[GET /proposals] total=${totalRes.rows[0].total} rows=${rowsRes.rows.length}`);
-    console.log('[GET /proposals] ids:', rowsRes.rows.map(r => ({
-      id: r.id, status: r.status,
-      musician_id: r.musician_id, contractor_id: r.contractor_id
-    })));
 
     const total = totalRes.rows[0].total;
     const data  = await Promise.all(rowsRes.rows.map(normalize));
@@ -208,15 +200,12 @@ router.post('/:id/counter', requireAuth, async (req, res) => {
     const senderId = req.userId;
     const { novo_cache, novo_horario, mensagem } = req.body || {};
 
-    console.log(`[COUNTER] proposal_id=${id} senderId=${senderId} body=`, { novo_cache, novo_horario, mensagem });
-
     if (!novo_cache && !novo_horario && !mensagem)
       return res.status(400).json({ error: 'Preencha ao menos um campo.' });
 
     const { rows: [prop] } = await pool.query(
       'SELECT id, contractor_id, musician_id, evento FROM proposals WHERE id = $1', [id]
     );
-    console.log(`[COUNTER] proposal encontrada:`, prop || 'NULL');
     if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
 
     // Registar contraproposta
@@ -231,13 +220,11 @@ router.post('/:id/counter', requireAuth, async (req, res) => {
     const { rows: [sender] } = await pool.query('SELECT name FROM users WHERE id = $1', [senderId]);
     const senderName  = sender ? sender.name : 'Utilizador';
     const cacheStr    = novo_cache ? ` de € ${parseFloat(novo_cache).toFixed(2)}` : '';
-    console.log(`[COUNTER] notificação → receiverId=${receiverId} sender="${senderName}"`);
     await pool.query(
       'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
       [receiverId, `${senderName} enviou uma contraproposta${cacheStr}: ${prop.evento}`]
     );
 
-    console.log(`[COUNTER] concluído — proposal ${id} status=negotiating`);
     res.status(201).json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
