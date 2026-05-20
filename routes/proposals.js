@@ -5,30 +5,42 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
 async function normalize(row) {
-  const { rows: counters } = await pool.query(
-    'SELECT novo_cache, novo_horario, mensagem FROM counters WHERE proposal_id = $1 ORDER BY id DESC LIMIT 1',
-    [row.id]
-  );
-  const { rows: contractors } = await pool.query('SELECT name FROM users WHERE id = $1', [row.contractor_id]);
+  const [countersRes, contractorRes, musicianRes] = await Promise.all([
+    pool.query(
+      'SELECT author_id, novo_cache, novo_horario, mensagem FROM counters WHERE proposal_id = $1 ORDER BY id DESC LIMIT 1',
+      [row.id]
+    ),
+    pool.query('SELECT name FROM users WHERE id = $1', [row.contractor_id]),
+    pool.query('SELECT name FROM users WHERE id = $1', [row.musician_id]),
+  ]);
 
-  const lastCounter = counters[0] || null;
-  const contractor  = contractors[0] || null;
+  const lastCounter = countersRes.rows[0] || null;
+  const contractor  = contractorRes.rows[0] || null;
+  const musician    = musicianRes.rows[0]   || null;
 
   return {
-    id:            row.id,
-    data_iso:      row.data_iso,
-    evento:        row.evento,
-    local:         row.local,
-    cache:         parseFloat(row.cache).toFixed(2),
+    id:             row.id,
+    contractor_id:  row.contractor_id,
+    musician_id:    row.musician_id,
+    data_iso:       row.data_iso,
+    evento:         row.evento,
+    local:          row.local,
+    cache:          parseFloat(row.cache).toFixed(2),
     horario_inicio: row.horario_inicio,
-    status:        row.status,
-    estilos:       JSON.parse(row.estilos || '[]'),
-    repertorio:    row.repertorio,
-    metodo:        row.metodo,
-    descricao:     row.descricao,
-    contractor:    { name: contractor ? contractor.name : '' },
-    lastCounter:   lastCounter
-      ? { novo_cache: lastCounter.novo_cache, novo_horario: lastCounter.novo_horario, mensagem: lastCounter.mensagem }
+    status:         row.status,
+    estilos:        JSON.parse(row.estilos || '[]'),
+    repertorio:     row.repertorio,
+    metodo:         row.metodo,
+    descricao:      row.descricao,
+    contractor:     { name: contractor ? contractor.name : '' },
+    musician:       { name: musician   ? musician.name   : '' },
+    lastCounter:    lastCounter
+      ? {
+          author_id:   lastCounter.author_id,
+          novo_cache:  lastCounter.novo_cache,
+          novo_horario: lastCounter.novo_horario,
+          mensagem:    lastCounter.mensagem,
+        }
       : null,
   };
 }
@@ -104,13 +116,26 @@ router.get('/', requireAuth, async (req, res) => {
     const uid    = req.userId;
     const offset = (page - 1) * limit;
 
+    // Retorna propostas onde o utilizador é músico OU contratante
     let totalRes, rowsRes;
     if (status && status !== 'all') {
-      totalRes = await pool.query('SELECT COUNT(*)::int AS total FROM proposals WHERE musician_id = $1 AND status = $2', [uid, status]);
-      rowsRes  = await pool.query('SELECT * FROM proposals WHERE musician_id = $1 AND status = $2 ORDER BY data_iso ASC LIMIT $3 OFFSET $4', [uid, status, limit, offset]);
+      totalRes = await pool.query(
+        'SELECT COUNT(*)::int AS total FROM proposals WHERE (musician_id = $1 OR contractor_id = $1) AND status = $2',
+        [uid, status]
+      );
+      rowsRes = await pool.query(
+        'SELECT * FROM proposals WHERE (musician_id = $1 OR contractor_id = $1) AND status = $2 ORDER BY data_iso ASC LIMIT $3 OFFSET $4',
+        [uid, status, limit, offset]
+      );
     } else {
-      totalRes = await pool.query('SELECT COUNT(*)::int AS total FROM proposals WHERE musician_id = $1', [uid]);
-      rowsRes  = await pool.query('SELECT * FROM proposals WHERE musician_id = $1 ORDER BY data_iso ASC LIMIT $2 OFFSET $3', [uid, limit, offset]);
+      totalRes = await pool.query(
+        'SELECT COUNT(*)::int AS total FROM proposals WHERE musician_id = $1 OR contractor_id = $1',
+        [uid]
+      );
+      rowsRes = await pool.query(
+        'SELECT * FROM proposals WHERE musician_id = $1 OR contractor_id = $1 ORDER BY data_iso ASC LIMIT $2 OFFSET $3',
+        [uid, limit, offset]
+      );
     }
 
     const total = totalRes.rows[0].total;
@@ -125,11 +150,25 @@ router.get('/', requireAuth, async (req, res) => {
 // PATCH /api/proposals/:id/accept
 router.patch('/:id/accept', requireAuth, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const { rows } = await pool.query('SELECT id FROM proposals WHERE id = $1', [id]);
-    if (!rows.length) return res.status(404).json({ error: 'Proposta não encontrada.' });
+    const id  = parseInt(req.params.id);
+    const uid = req.userId;
+
+    const { rows: [prop] } = await pool.query(
+      'SELECT id, contractor_id, musician_id, evento FROM proposals WHERE id = $1', [id]
+    );
+    if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
 
     await pool.query("UPDATE proposals SET status = 'confirmed', updated_at = NOW() WHERE id = $1", [id]);
+
+    // Notificar o outro participante
+    const otherId = uid === prop.musician_id ? prop.contractor_id : prop.musician_id;
+    const { rows: [me] } = await pool.query('SELECT name FROM users WHERE id = $1', [uid]);
+    const meName = me ? me.name : 'Utilizador';
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+      [otherId, `${meName} aceitou a proposta: ${prop.evento}`]
+    );
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -156,20 +195,34 @@ router.patch('/:id/decline', requireAuth, async (req, res) => {
 // POST /api/proposals/:id/counter
 router.post('/:id/counter', requireAuth, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id       = parseInt(req.params.id);
+    const senderId = req.userId;
     const { novo_cache, novo_horario, mensagem } = req.body || {};
 
     if (!novo_cache && !novo_horario && !mensagem)
       return res.status(400).json({ error: 'Preencha ao menos um campo.' });
 
-    const { rows } = await pool.query('SELECT id FROM proposals WHERE id = $1', [id]);
-    if (!rows.length) return res.status(404).json({ error: 'Proposta não encontrada.' });
+    const { rows: [prop] } = await pool.query(
+      'SELECT id, contractor_id, musician_id, evento FROM proposals WHERE id = $1', [id]
+    );
+    if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
 
+    // Registar contraproposta
     await pool.query(
       'INSERT INTO counters (proposal_id, author_id, novo_cache, novo_horario, mensagem) VALUES ($1,$2,$3,$4,$5)',
-      [id, req.userId, novo_cache || null, novo_horario || null, mensagem || null]
+      [id, senderId, novo_cache || null, novo_horario || null, mensagem || null]
     );
     await pool.query("UPDATE proposals SET status = 'negotiating', updated_at = NOW() WHERE id = $1", [id]);
+
+    // Notificar o OUTRO participante
+    const receiverId = senderId === prop.musician_id ? prop.contractor_id : prop.musician_id;
+    const { rows: [sender] } = await pool.query('SELECT name FROM users WHERE id = $1', [senderId]);
+    const senderName  = sender ? sender.name : 'Utilizador';
+    const cacheStr    = novo_cache ? ` de € ${parseFloat(novo_cache).toFixed(2)}` : '';
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+      [receiverId, `${senderName} enviou uma contraproposta${cacheStr}: ${prop.evento}`]
+    );
 
     res.status(201).json({ ok: true });
   } catch (e) {
