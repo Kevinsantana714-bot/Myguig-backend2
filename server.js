@@ -34,6 +34,27 @@ app.use('/api/events',        eventsRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
+// Diagnóstico — inspeciona propostas e utilizadores diretamente na BD
+app.get('/health/db', async (_, res) => {
+  try {
+    const { init, pool } = require('./db');
+    const users     = await pool.query('SELECT id, name, email, role FROM users ORDER BY id');
+    const proposals = await pool.query(
+      'SELECT id, status, musician_id, contractor_id, evento FROM proposals ORDER BY id'
+    );
+    const cols = await pool.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = 'proposals' ORDER BY ordinal_position"
+    );
+    res.json({
+      users:     users.rows,
+      proposals: proposals.rows,
+      proposal_columns: cols.rows.map(r => r.column_name),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Diagnóstico temporário — confirma se as credenciais Cloudinary estão no ambiente
 app.get('/health/cloudinary', async (_, res) => {
   try {
