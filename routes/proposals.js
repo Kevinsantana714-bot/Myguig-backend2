@@ -239,11 +239,11 @@ router.patch('/:id/cancel', requireAuth, async (req, res) => {
     const uid = req.userId;
 
     const { rows: [prop] } = await pool.query(
-      'SELECT id, contractor_id, musician_id, evento, data_iso FROM proposals WHERE id = $1',
+      "SELECT id, contractor_id, musician_id, evento, data_iso FROM proposals WHERE id = $1 AND status != 'cancelled'",
       [id]
     );
 
-    if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
+    if (!prop) return res.status(404).json({ error: 'Proposta não encontrada ou já cancelada.' });
     if (prop.musician_id !== uid && prop.contractor_id !== uid)
       return res.status(403).json({ error: 'Sem permissão para cancelar esta proposta.' });
 
