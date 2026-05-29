@@ -77,6 +77,9 @@ async function init() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cidade       VARCHAR(100)`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url   TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone        VARCHAR(30)`);
+  // Recuperação de senha por email
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token         TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ`);
 
   // Eventos manuais da agenda (sincronizados entre dispositivos)
   await pool.query(`
