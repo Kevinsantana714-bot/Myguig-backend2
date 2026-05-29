@@ -137,7 +137,7 @@ router.post('/forgot-password', async (req, res) => {
     );
 
     await mailer.emails.send({
-      from:    'MyGUIG <noreply@myguig.com>',
+      from:    'MyGUIG <onboarding@resend.dev>',
       to:      [email.trim().toLowerCase()],
       subject: 'O teu código de recuperação — MyGUIG',
       html: `
