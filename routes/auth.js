@@ -1,7 +1,6 @@
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const crypto  = require('crypto');
 const { pool }        = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const mailer          = require('../config/mailer');
@@ -114,7 +113,7 @@ router.put('/profile', requireAuth, async (req, res) => {
   }
 });
 
-// POST /auth/forgot-password
+// POST /auth/forgot-password  — gera código de 6 dígitos, válido 15 min
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body || {};
@@ -128,44 +127,39 @@ router.post('/forgot-password', async (req, res) => {
     // Sempre retorna 200 — não revelar se o email existe ou não
     if (!rows.length) return res.json({ ok: true });
 
-    const user  = rows[0];
-    const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // +1 hora
+    const user    = rows[0];
+    const code    = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+    const expires = new Date(Date.now() + 15 * 60 * 1000);               // +15 minutos
 
     await pool.query(
       'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3',
-      [token, expires, user.id]
+      [code, expires, user.id]
     );
-
-    const link = `https://myguig-frontend.vercel.app?reset_token=${token}`;
 
     await mailer.sendMail({
       from: `"MyGUIG" <${process.env.EMAIL_USER}>`,
       to:   email.trim().toLowerCase(),
-      subject: 'Recuperação de senha — MyGUIG',
+      subject: 'O teu código de recuperação — MyGUIG',
       text: [
-        `Olá ${user.name},`,
+        `O teu código de verificação é:`,
         '',
-        'Recebemos um pedido para recuperar a tua senha.',
-        'Clica no link abaixo para definir uma nova senha (válido por 1 hora):',
+        `    ${code}`,
         '',
-        link,
-        '',
-        'Se não fizeste este pedido, ignora este email.',
+        'Válido por 15 minutos.',
+        'Se não pediste isto, ignora este email.',
         '',
         '— Equipa MyGUIG',
       ].join('\n'),
       html: `
-        <div style="font-family:sans-serif;max-width:520px;margin:auto;background:#0e0e0e;color:#ccc;padding:32px;border-radius:12px">
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0e0e0e;color:#ccc;padding:32px;border-radius:12px">
           <div style="text-align:center;margin-bottom:24px">
             <span style="font-size:22px;font-weight:700;color:#fff">My<span style="color:#a78bfa">GUIG</span></span>
           </div>
-          <p style="margin:0 0 8px">Olá <strong style="color:#fff">${user.name}</strong>,</p>
-          <p style="margin:0 0 20px;line-height:1.6">Recebemos um pedido para recuperar a tua senha.<br>Clica no botão abaixo para definir uma nova senha. O link é válido por <strong style="color:#fff">1 hora</strong>.</p>
-          <div style="text-align:center;margin:28px 0">
-            <a href="${link}" style="background:#7B52F0;color:#fff;text-decoration:none;padding:13px 32px;border-radius:8px;font-weight:600;font-size:15px;display:inline-block">Redefinir senha</a>
+          <p style="margin:0 0 20px;line-height:1.6">O teu código de verificação é:</p>
+          <div style="text-align:center;margin:24px 0">
+            <span style="font-size:40px;font-weight:700;color:#a78bfa;letter-spacing:12px;background:#1e1535;padding:16px 28px;border-radius:12px;display:inline-block">${code}</span>
           </div>
-          <p style="font-size:12px;color:#555;margin:24px 0 0;line-height:1.6">Se não fizeste este pedido, podes ignorar este email. A tua senha não será alterada.<br><br>— Equipa MyGUIG</p>
+          <p style="font-size:13px;color:#666;text-align:center;margin:16px 0 0;line-height:1.6">Válido por <strong style="color:#ccc">15 minutos</strong>.<br>Se não pediste isto, ignora este email.</p>
         </div>
       `,
     });
@@ -177,21 +171,25 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// POST /auth/reset-password
+// POST /auth/reset-password  — verifica email + código + define nova senha
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, new_password } = req.body || {};
-    if (!token)        return res.status(400).json({ error: 'token é obrigatório.' });
+    const { email, code, new_password } = req.body || {};
+    if (!email)        return res.status(400).json({ error: 'email é obrigatório.' });
+    if (!code)         return res.status(400).json({ error: 'code é obrigatório.' });
     if (!new_password) return res.status(400).json({ error: 'new_password é obrigatório.' });
     if (new_password.length < 8)
       return res.status(400).json({ error: 'A senha deve ter ao menos 8 caracteres.' });
 
     const { rows } = await pool.query(
-      'SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
-      [token]
+      `SELECT id FROM users
+        WHERE email = $1
+          AND reset_token = $2
+          AND reset_token_expires > NOW()`,
+      [email.trim().toLowerCase(), String(code).trim()]
     );
     if (!rows.length)
-      return res.status(400).json({ error: 'Link inválido ou expirado. Solicita um novo link.' });
+      return res.status(400).json({ error: 'Código inválido ou expirado. Solicita um novo código.' });
 
     const password_hash = await bcrypt.hash(new_password, SALT_ROUNDS);
 
