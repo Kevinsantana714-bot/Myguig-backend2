@@ -136,30 +136,17 @@ router.post('/forgot-password', async (req, res) => {
       [code, expires, user.id]
     );
 
-    await mailer.sendMail({
-      from: `"MyGUIG" <${process.env.EMAIL_USER}>`,
-      to:   email.trim().toLowerCase(),
+    await mailer.emails.send({
+      from:    'MyGUIG <noreply@myguig.com>',
+      to:      [email.trim().toLowerCase()],
       subject: 'O teu código de recuperação — MyGUIG',
-      text: [
-        `O teu código de verificação é:`,
-        '',
-        `    ${code}`,
-        '',
-        'Válido por 15 minutos.',
-        'Se não pediste isto, ignora este email.',
-        '',
-        '— Equipa MyGUIG',
-      ].join('\n'),
       html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0e0e0e;color:#ccc;padding:32px;border-radius:12px">
-          <div style="text-align:center;margin-bottom:24px">
-            <span style="font-size:22px;font-weight:700;color:#fff">My<span style="color:#a78bfa">GUIG</span></span>
-          </div>
-          <p style="margin:0 0 20px;line-height:1.6">O teu código de verificação é:</p>
-          <div style="text-align:center;margin:24px 0">
-            <span style="font-size:40px;font-weight:700;color:#a78bfa;letter-spacing:12px;background:#1e1535;padding:16px 28px;border-radius:12px;display:inline-block">${code}</span>
-          </div>
-          <p style="font-size:13px;color:#666;text-align:center;margin:16px 0 0;line-height:1.6">Válido por <strong style="color:#ccc">15 minutos</strong>.<br>Se não pediste isto, ignora este email.</p>
+        <div style="font-family:sans-serif;max-width:400px;margin:0 auto;">
+          <h2 style="margin:0 0 8px">Recuperação de senha</h2>
+          <p style="margin:0 0 16px;color:#444">O teu código de verificação é:</p>
+          <h1 style="letter-spacing:8px;color:#7c3aed;margin:0 0 16px">${code}</h1>
+          <p style="margin:0 0 8px;color:#444">Válido por 15 minutos.</p>
+          <p style="color:#888;font-size:13px">Se não pediste isto, ignora este email.</p>
         </div>
       `,
     });
