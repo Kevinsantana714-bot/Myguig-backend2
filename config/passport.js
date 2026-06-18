@@ -6,7 +6,7 @@ passport.use(new GoogleStrategy(
   {
     clientID:     process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL:  `${process.env.BACKEND_URL || 'https://myguig-backend-production.up.railway.app'}/auth/google/callback`,
+    callbackURL:  'https://myguig-backend-production.up.railway.app/api/auth/google/callback',
   },
   async (_accessToken, _refreshToken, profile, done) => {
     try {

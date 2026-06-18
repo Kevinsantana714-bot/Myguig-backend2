@@ -35,6 +35,7 @@ app.use(session({
 app.use(passport.initialize());
 
 app.use('/auth',              authRoutes);
+app.use('/api/auth',          authRoutes); // alias para o callback do Google OAuth (/api/auth/google/callback)
 app.use('/api/proposals',     proposalsRoutes);
 app.use('/api/proposals',     sendProposalRoutes);
 app.use('/api/notifications', notificationsRoutes);
