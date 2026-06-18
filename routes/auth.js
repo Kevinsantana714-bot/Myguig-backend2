@@ -65,7 +65,7 @@ router.post('/logout', requireAuth, (_req, res) => res.json({ ok: true }));
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, google_id FROM users WHERE id = $1',
+      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, google_id, onboarding_complete FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado.' });
@@ -79,20 +79,25 @@ router.get('/me', requireAuth, async (req, res) => {
 // PUT /auth/profile
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    const { name, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone } = req.body || {};
+    const { name, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, role, onboarding_complete } = req.body || {};
+
+    const validRoles = ['musician', 'artist', 'contractor'];
+    const safeRole   = role && validRoles.includes(role) ? role : null;
 
     const { rows } = await pool.query(
       `UPDATE users
-         SET name         = COALESCE($1, name),
-             bio          = COALESCE($2, bio),
-             estilos      = COALESCE($3, estilos),
-             instagram    = COALESCE($4, instagram),
-             cache_minimo = COALESCE($5, cache_minimo),
-             cidade       = COALESCE($6, cidade),
-             avatar_url   = COALESCE($8, avatar_url),
-             phone        = COALESCE($9, phone)
+         SET name                = COALESCE($1, name),
+             bio                 = COALESCE($2, bio),
+             estilos             = COALESCE($3, estilos),
+             instagram           = COALESCE($4, instagram),
+             cache_minimo        = COALESCE($5, cache_minimo),
+             cidade              = COALESCE($6, cidade),
+             avatar_url          = COALESCE($8, avatar_url),
+             phone               = COALESCE($9, phone),
+             role                = COALESCE($10, role),
+             onboarding_complete = COALESCE($11, onboarding_complete)
          WHERE id = $7
-         RETURNING id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone`,
+         RETURNING id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, google_id, onboarding_complete`,
       [
         name      ? name.trim()                   : null,
         bio       ? bio.trim()                    : null,
@@ -103,6 +108,8 @@ router.put('/profile', requireAuth, async (req, res) => {
         req.userId,
         avatar_url ? avatar_url.trim()            : null,
         phone      ? phone.trim()                 : null,
+        safeRole,
+        onboarding_complete != null ? Boolean(onboarding_complete) : null,
       ]
     );
 
@@ -127,12 +134,13 @@ router.get('/google/callback',
       const user  = req.user;
       const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
       const userJson = encodeURIComponent(JSON.stringify({
-        id:         user.id,
-        name:       user.name,
-        email:      user.email,
-        role:       user.role,
-        avatar_url: user.avatar_url || null,
-        google_id:  user.google_id  || null,
+        id:                  user.id,
+        name:                user.name,
+        email:               user.email,
+        role:                user.role,
+        avatar_url:          user.avatar_url          || null,
+        google_id:           user.google_id           || null,
+        onboarding_complete: user.onboarding_complete || false,
       }));
       const frontendUrl = process.env.FRONTEND_URL || 'https://myguig-frontend.vercel.app';
       res.redirect(`${frontendUrl}?token=${token}&user=${userJson}`);

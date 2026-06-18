@@ -84,6 +84,9 @@ async function init() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT`);
   // Permitir password_hash NULL (contas Google não têm senha)
   await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`);
+  // Onboarding pós-Google
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_complete BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`UPDATE users SET onboarding_complete = TRUE WHERE password_hash IS NOT NULL AND onboarding_complete = FALSE`);
 
   // Eventos manuais da agenda (sincronizados entre dispositivos)
   await pool.query(`
