@@ -11,7 +11,7 @@ async function init() {
       id            SERIAL      PRIMARY KEY,
       name          TEXT        NOT NULL,
       email         TEXT        NOT NULL UNIQUE,
-      password_hash TEXT        NOT NULL,
+      password_hash TEXT,
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -82,6 +82,8 @@ async function init() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ`);
   // Login com Google
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT`);
+  // Permitir password_hash NULL (contas Google não têm senha)
+  await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`);
 
   // Eventos manuais da agenda (sincronizados entre dispositivos)
   await pool.query(`
