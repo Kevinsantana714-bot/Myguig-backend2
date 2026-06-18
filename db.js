@@ -80,6 +80,8 @@ async function init() {
   // Recuperação de senha por email
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token         TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ`);
+  // Login com Google
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT`);
 
   // Eventos manuais da agenda (sincronizados entre dispositivos)
   await pool.query(`

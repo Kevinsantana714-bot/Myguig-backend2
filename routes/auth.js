@@ -1,6 +1,7 @@
-const express = require('express');
-const bcrypt  = require('bcrypt');
-const jwt     = require('jsonwebtoken');
+const express  = require('express');
+const bcrypt   = require('bcrypt');
+const jwt      = require('jsonwebtoken');
+const passport = require('../config/passport');
 const { pool }        = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const mailer          = require('../config/mailer');
@@ -64,7 +65,7 @@ router.post('/logout', requireAuth, (_req, res) => res.json({ ok: true }));
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone FROM users WHERE id = $1',
+      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, google_id FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado.' });
@@ -112,6 +113,35 @@ router.put('/profile', requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Google OAuth ─────────────────────────────────────────────────────────────
+
+// GET /auth/google  — redireciona para consentimento Google
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+
+// GET /auth/google/callback  — Google redireciona aqui depois do utilizador aceitar
+router.get('/google/callback',
+  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL || 'https://myguig-frontend.vercel.app'}?google_error=1`, session: false }),
+  (req, res) => {
+    try {
+      const user  = req.user;
+      const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      const userJson = encodeURIComponent(JSON.stringify({
+        id:         user.id,
+        name:       user.name,
+        email:      user.email,
+        role:       user.role,
+        avatar_url: user.avatar_url || null,
+        google_id:  user.google_id  || null,
+      }));
+      const frontendUrl = process.env.FRONTEND_URL || 'https://myguig-frontend.vercel.app';
+      res.redirect(`${frontendUrl}?token=${token}&user=${userJson}`);
+    } catch (e) {
+      console.error('[google/callback]', e.message);
+      res.redirect(`${process.env.FRONTEND_URL || 'https://myguig-frontend.vercel.app'}?google_error=1`);
+    }
+  }
+);
 
 // POST /auth/forgot-password  — gera código de 6 dígitos, válido 15 min
 router.post('/forgot-password', async (req, res) => {
