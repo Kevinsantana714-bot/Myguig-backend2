@@ -180,13 +180,26 @@ router.patch('/:id/accept', requireAuth, async (req, res) => {
 router.patch('/:id/decline', requireAuth, async (req, res) => {
   try {
     const id     = parseInt(req.params.id);
+    const uid    = req.userId;
     const reason = (req.body || {}).reason;
     if (!reason) return res.status(400).json({ error: 'reason é obrigatório.' });
 
-    const { rows } = await pool.query('SELECT id FROM proposals WHERE id = $1', [id]);
-    if (!rows.length) return res.status(404).json({ error: 'Proposta não encontrada.' });
+    const { rows: [prop] } = await pool.query(
+      'SELECT id, contractor_id, musician_id, evento FROM proposals WHERE id = $1', [id]
+    );
+    if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
+    if (prop.musician_id !== uid && prop.contractor_id !== uid)
+      return res.status(403).json({ error: 'Sem permissão para recusar esta proposta.' });
 
     await pool.query("UPDATE proposals SET status = 'declined', updated_at = NOW() WHERE id = $1", [id]);
+
+    // Notificar quem enviou a proposta/contraproposta de que não foi aceite
+    const otherId = uid === prop.musician_id ? prop.contractor_id : prop.musician_id;
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+      [otherId, `A sua proposta "${prop.evento}" não foi aceite.`]
+    );
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
