@@ -82,6 +82,7 @@ async function init() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ`);
   // Login com Google
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_url  TEXT`);
   // Permitir password_hash NULL (contas Google não têm senha)
   await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`);
   // Onboarding pós-Google

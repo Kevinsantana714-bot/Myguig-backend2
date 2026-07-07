@@ -2,6 +2,7 @@ const express        = require('express');
 const { pool }       = require('../db');
 const { requireAuth} = require('../middleware/auth');
 const upload         = require('../config/upload');
+const uploadCover    = require('../config/uploadCover');
 
 const router = express.Router();
 
@@ -38,6 +39,31 @@ router.post('/avatar', requireAuth, (req, res, next) => {
     res.json({ avatar_url });
   } catch (e) {
     console.error('[avatar upload] db error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/users/cover  — upload de capa para Cloudinary (autenticado)
+router.post('/cover', requireAuth, (req, res, next) => {
+  if (!process.env.CLOUDINARY_CLOUD_NAME) {
+    return res.status(503).json({ error: 'Serviço de upload não configurado. Contacte o administrador.' });
+  }
+  uploadCover.single('cover')(req, res, (err) => {
+    if (err) {
+      const msg = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      console.error('[cover upload] multer/cloudinary error:', msg, err);
+      return res.status(500).json({ error: msg || 'Erro no upload. Verifica as credenciais Cloudinary.' });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Nenhum ficheiro enviado.' });
+    const cover_url = req.file.path;
+    await pool.query('UPDATE users SET cover_url = $1 WHERE id = $2', [cover_url, req.userId]);
+    res.json({ cover_url });
+  } catch (e) {
+    console.error('[cover upload] db error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -85,7 +111,7 @@ router.get('/:id', async (req, res) => {
     if (!id || isNaN(id)) return res.status(400).json({ error: 'ID inválido.' });
 
     const { rows } = await pool.query(
-      `SELECT id, name, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone
+      `SELECT id, name, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, cover_url, phone
          FROM users WHERE id = $1`,
       [id]
     );
@@ -110,7 +136,8 @@ router.get('/:id', async (req, res) => {
         instagram:       u.instagram || '',
         cache_minimo:    parseFloat(u.cache_minimo || 0).toFixed(2),
         cidade:          u.cidade || '',
-        avatar_url:      u.avatar_url || null,
+        avatar_url:      u.avatar_url  || null,
+        cover_url:       u.cover_url   || null,
         phone:           u.phone || '',
         shows_confirmed: count,
       }

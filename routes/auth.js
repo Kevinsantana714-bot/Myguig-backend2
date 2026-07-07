@@ -65,7 +65,7 @@ router.post('/logout', requireAuth, (_req, res) => res.json({ ok: true }));
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, google_id, onboarding_complete FROM users WHERE id = $1',
+      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, cover_url, phone, google_id, onboarding_complete FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado.' });
@@ -139,6 +139,7 @@ router.get('/google/callback',
         email:               user.email,
         role:                user.role,
         avatar_url:          user.avatar_url          || null,
+        cover_url:           user.cover_url           || null,
         google_id:           user.google_id           || null,
         onboarding_complete: user.onboarding_complete || false,
       }));
