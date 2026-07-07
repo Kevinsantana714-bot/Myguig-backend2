@@ -42,6 +42,42 @@ router.post('/avatar', requireAuth, (req, res, next) => {
   }
 });
 
+// GET /api/users/:id/availability?month=AAAA-MM  — datas ocupadas (sem autenticação)
+router.get('/:id/availability', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: 'ID inválido.' });
+
+    const month = req.query.month;
+    if (!month || !/^\d{4}-\d{2}$/.test(month))
+      return res.status(400).json({ error: 'Parâmetro month inválido. Use formato AAAA-MM.' });
+
+    const [year, mon] = month.split('-').map(Number);
+    const start  = `${year}-${String(mon).padStart(2,'0')}-01`;
+    const lastD  = new Date(year, mon, 0).getDate();
+    const end    = `${year}-${String(mon).padStart(2,'0')}-${String(lastD).padStart(2,'0')}`;
+
+    const { rows: propRows } = await pool.query(
+      `SELECT data_iso::text AS date FROM proposals
+         WHERE musician_id = $1 AND status = 'confirmed'
+           AND data_iso BETWEEN $2 AND $3`,
+      [id, start, end]
+    );
+    const { rows: evtRows } = await pool.query(
+      `SELECT date::text AS date FROM manual_events
+         WHERE user_id = $1 AND date BETWEEN $2 AND $3`,
+      [id, start, end]
+    );
+
+    const all      = [...propRows, ...evtRows].map(r => r.date.slice(0, 10));
+    const occupied = [...new Set(all)].sort();
+
+    res.json({ occupied });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/users/:id  — perfil público (sem autenticação)
 router.get('/:id', async (req, res) => {
   try {
