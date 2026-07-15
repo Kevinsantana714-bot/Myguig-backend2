@@ -88,6 +88,8 @@ async function init() {
   // Onboarding pós-Google
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_complete BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`UPDATE users SET onboarding_complete = TRUE WHERE password_hash IS NOT NULL AND onboarding_complete = FALSE`);
+  // Corrige dados legados: propostas antigas gravadas como 'accepted' antes da renomeação para 'confirmed'
+  await pool.query(`UPDATE proposals SET status = 'confirmed' WHERE status = 'accepted'`);
   // Painel de admin
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE`);
 
