@@ -65,7 +65,7 @@ router.post('/logout', requireAuth, (_req, res) => res.json({ ok: true }));
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, cover_url, phone, google_id, onboarding_complete FROM users WHERE id = $1',
+      'SELECT id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, cover_url, phone, google_id, onboarding_complete, is_admin FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado.' });
@@ -97,7 +97,7 @@ router.put('/profile', requireAuth, async (req, res) => {
              role                = COALESCE($10, role),
              onboarding_complete = COALESCE($11, onboarding_complete)
          WHERE id = $7
-         RETURNING id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, google_id, onboarding_complete`,
+         RETURNING id, name, email, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, phone, google_id, onboarding_complete, is_admin`,
       [
         name      ? name.trim()                   : null,
         bio       ? bio.trim()                    : null,
@@ -142,6 +142,7 @@ router.get('/google/callback',
         cover_url:           user.cover_url           || null,
         google_id:           user.google_id           || null,
         onboarding_complete: user.onboarding_complete || false,
+        is_admin:            user.is_admin            || false,
       }));
       const frontendUrl = process.env.FRONTEND_URL || 'https://myguig-frontend.vercel.app';
       res.redirect(`${frontendUrl}?token=${token}&user=${userJson}`);

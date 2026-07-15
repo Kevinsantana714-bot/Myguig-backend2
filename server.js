@@ -7,6 +7,7 @@ const http     = require('http');
 const { Server } = require('socket.io');
 const jwt      = require('jsonwebtoken');
 const realtime = require('./realtime');
+const adminRoutes = require('./routes/admin');
 
 const { init, seed }    = require('./db');
 const authRoutes         = require('./routes/auth');
@@ -67,6 +68,7 @@ app.use('/api/musicians',     musiciansRoutes);
 app.use('/api/users',         usersRoutes);
 app.use('/api',               messagesRoutes);
 app.use('/api/events',        eventsRoutes);
+app.use('/api/admin',         adminRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 

@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { pool } = require('../db');
 
 function requireAuth(req, res, next) {
   const header = req.headers['authorization'] || '';
@@ -13,4 +14,16 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth };
+async function requireAdmin(req, res, next) {
+  try {
+    const { rows } = await pool.query('SELECT is_admin FROM users WHERE id = $1', [req.userId]);
+    if (!rows.length || !rows[0].is_admin) {
+      return res.status(403).json({ error: 'Acesso restrito a administradores.' });
+    }
+    next();
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+module.exports = { requireAuth, requireAdmin };
