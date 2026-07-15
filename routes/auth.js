@@ -52,7 +52,26 @@ router.post('/login', async (req, res) => {
     const valid = row && await bcrypt.compare(password, row.password_hash);
     if (!valid) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
-    res.json({ token: makeToken(row), user: { id: row.id, name: row.name, email: row.email } });
+    res.json({
+      token: makeToken(row),
+      user: {
+        id:                  row.id,
+        name:                row.name,
+        email:               row.email,
+        role:                row.role,
+        bio:                 row.bio,
+        estilos:             JSON.parse(row.estilos || '[]'),
+        instagram:           row.instagram,
+        cache_minimo:        row.cache_minimo,
+        cidade:              row.cidade,
+        avatar_url:          row.avatar_url,
+        cover_url:           row.cover_url,
+        phone:               row.phone,
+        google_id:           row.google_id,
+        onboarding_complete: row.onboarding_complete,
+        is_admin:            row.is_admin || false,
+      },
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
