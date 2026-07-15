@@ -111,11 +111,11 @@ router.get('/:id', async (req, res) => {
     if (!id || isNaN(id)) return res.status(400).json({ error: 'ID inválido.' });
 
     const { rows } = await pool.query(
-      `SELECT id, name, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, cover_url, phone
+      `SELECT id, name, role, bio, estilos, instagram, cache_minimo, cidade, avatar_url, cover_url, phone, is_admin
          FROM users WHERE id = $1`,
       [id]
     );
-    if (!rows.length) return res.status(404).json({ error: 'Utilizador não encontrado.' });
+    if (!rows.length || rows[0].is_admin) return res.status(404).json({ error: 'Utilizador não encontrado.' });
 
     const u = rows[0];
 

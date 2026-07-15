@@ -57,6 +57,10 @@ router.post('/', requireAuth, async (req, res) => {
     if (!musician_id || !evento || !data_iso || !local || cache == null)
       return res.status(400).json({ error: 'musician_id, evento, data_iso, local e cache são obrigatórios.' });
 
+    const { rows: [targetUser] } = await pool.query('SELECT is_admin FROM users WHERE id = $1', [parseInt(musician_id)]);
+    if (!targetUser || targetUser.is_admin)
+      return res.status(404).json({ error: 'Músico não encontrado.' });
+
     const contractor_id = req.userId;
 
     // 1. Inserir proposta
