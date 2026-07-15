@@ -28,8 +28,8 @@ router.get('/', requireAuth, async (req, res) => {
     const style  = (req.query.style  || '').trim();
     const cidade = (req.query.cidade || '').trim();
 
-    // Exclui sempre o próprio utilizador autenticado dos resultados
-    const conditions = [`role = 'musician'`, `id != $1`];
+    // Exclui sempre o próprio utilizador autenticado, e também contas de admin (não devem aparecer publicamente)
+    const conditions = [`role = 'musician'`, `id != $1`, `is_admin = false`];
     const params     = [req.userId];
 
     if (search) {
