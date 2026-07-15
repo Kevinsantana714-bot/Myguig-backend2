@@ -103,7 +103,7 @@ router.post('/', requireAuth, async (req, res) => {
     await pool.query(
       'INSERT INTO messages (conversation_id, sender_id, body) VALUES ($1,$2,$3)',
       [conversation_id, contractor_id,
-       `📋 Proposta enviada: ${evento} em ${data_iso}. Cachê: € ${parseFloat(cache).toFixed(2)}`]
+       `Proposta enviada: ${evento} em ${data_iso}. Cachê: € ${parseFloat(cache).toFixed(2)}`]
     );
 
     res.status(201).json({ ok: true, proposal_id, conversation_id });
