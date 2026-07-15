@@ -79,27 +79,32 @@ router.post('/', requireAuth, async (req, res) => {
       [parseInt(musician_id), `Nova proposta recebida: ${evento}`]
     );
 
-    // 3. Conversa (só se não existir para esta proposta)
-    const { rows: existing } = await pool.query(
-      'SELECT id FROM conversations WHERE proposal_id = $1', [proposal_id]
+    // 3. Conversa — reaproveita a conversa já existente entre estes dois utilizadores,
+    // independentemente de qual proposta a originou, para não duplicar a pessoa na lista.
+    const { rows: existingConv } = await pool.query(
+      `SELECT id FROM conversations
+       WHERE (user_a_id = $1 AND user_b_id = $2) OR (user_a_id = $2 AND user_b_id = $1)
+       LIMIT 1`,
+      [contractor_id, parseInt(musician_id)]
     );
     let conversation_id;
-    if (existing.length) {
-      conversation_id = existing[0].id;
+    if (existingConv.length) {
+      conversation_id = existingConv[0].id;
     } else {
       const { rows: [conv] } = await pool.query(
         'INSERT INTO conversations (user_a_id, user_b_id, proposal_id) VALUES ($1,$2,$3) RETURNING id',
         [contractor_id, parseInt(musician_id), proposal_id]
       );
       conversation_id = conv.id;
-
-      // 4. Primeira mensagem automática
-      await pool.query(
-        'INSERT INTO messages (conversation_id, sender_id, body) VALUES ($1,$2,$3)',
-        [conversation_id, contractor_id,
-         `📋 Proposta enviada: ${evento} em ${data_iso}. Cachê: R$ ${parseFloat(cache).toFixed(2)}`]
-      );
     }
+
+    // 4. Mensagem automática anunciando a nova proposta — sempre enviada,
+    // mesmo quando a conversa já existia, para ficar no histórico.
+    await pool.query(
+      'INSERT INTO messages (conversation_id, sender_id, body) VALUES ($1,$2,$3)',
+      [conversation_id, contractor_id,
+       `📋 Proposta enviada: ${evento} em ${data_iso}. Cachê: € ${parseFloat(cache).toFixed(2)}`]
+    );
 
     res.status(201).json({ ok: true, proposal_id, conversation_id });
   } catch (e) {
