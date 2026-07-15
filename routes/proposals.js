@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool }        = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const realtime = require('../realtime');
 
 const router = express.Router();
 
@@ -78,6 +79,8 @@ router.post('/', requireAuth, async (req, res) => {
       'INSERT INTO notifications (user_id, message) VALUES ($1,$2)',
       [parseInt(musician_id), `Nova proposta recebida: ${evento}`]
     );
+    realtime.emitToUser(parseInt(musician_id), 'notification:new', { message: `Nova proposta recebida: ${evento}` });
+    realtime.emitToUser(parseInt(musician_id), 'proposal:update', {});
 
     // 3. Conversa — reaproveita a conversa já existente entre estes dois utilizadores,
     // independentemente de qual proposta a originou, para não duplicar a pessoa na lista.
@@ -174,6 +177,8 @@ router.patch('/:id/accept', requireAuth, async (req, res) => {
       'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
       [otherId, `${meName} aceitou a proposta: ${prop.evento}`]
     );
+    realtime.emitToUser(otherId, 'notification:new', { message: `${meName} aceitou a proposta: ${prop.evento}` });
+    realtime.emitToUser(otherId, 'proposal:update', {});
 
     res.json({ ok: true });
   } catch (e) {
@@ -204,6 +209,8 @@ router.patch('/:id/decline', requireAuth, async (req, res) => {
       'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
       [otherId, `A sua proposta "${prop.evento}" não foi aceite.`]
     );
+    realtime.emitToUser(otherId, 'notification:new', { message: `A sua proposta "${prop.evento}" não foi aceite.` });
+    realtime.emitToUser(otherId, 'proposal:update', {});
 
     res.json({ ok: true });
   } catch (e) {
@@ -242,6 +249,8 @@ router.post('/:id/counter', requireAuth, async (req, res) => {
       'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
       [receiverId, `${senderName} enviou uma contraproposta${cacheStr}: ${prop.evento}`]
     );
+    realtime.emitToUser(receiverId, 'notification:new', { message: `${senderName} enviou uma contraproposta${cacheStr}: ${prop.evento}` });
+    realtime.emitToUser(receiverId, 'proposal:update', {});
 
     res.status(201).json({ ok: true });
   } catch (e) {
@@ -280,6 +289,8 @@ router.patch('/:id/cancel', requireAuth, async (req, res) => {
       'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
       [otherId, `${cancellerName} cancelou o evento: ${prop.evento} em ${dataStr}`]
     );
+    realtime.emitToUser(otherId, 'notification:new', { message: `${cancellerName} cancelou o evento: ${prop.evento} em ${dataStr}` });
+    realtime.emitToUser(otherId, 'proposal:update', {});
 
     await pool.query(
       "UPDATE proposals SET status = 'cancelled', updated_at = NOW() WHERE id = $1",

@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool }        = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const realtime = require('../realtime');
 
 const router = express.Router();
 
@@ -131,6 +132,10 @@ router.post('/conversations/:id/messages', requireAuth, async (req, res) => {
       'INSERT INTO notifications (user_id, message) VALUES ($1,$2)',
       [other_id, `Nova mensagem de ${sender ? sender.name : 'alguém'}`]
     );
+    realtime.emitToUser(other_id, 'notification:new', { message: `Nova mensagem de ${sender ? sender.name : 'alguém'}` });
+    realtime.emitToUser(other_id, 'message:new', {
+      conversation_id: conv_id, sender_id: uid, body, created_at: new Date().toISOString(),
+    });
 
     res.status(201).json({ ok: true, message_id: msg.id });
   } catch (e) {

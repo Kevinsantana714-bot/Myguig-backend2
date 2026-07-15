@@ -3,6 +3,10 @@ const express  = require('express');
 const cors     = require('cors');
 const session  = require('express-session');
 const passport = require('./config/passport');
+const http     = require('http');
+const { Server } = require('socket.io');
+const jwt      = require('jsonwebtoken');
+const realtime = require('./realtime');
 
 const { init, seed }    = require('./db');
 const authRoutes         = require('./routes/auth');
@@ -14,7 +18,27 @@ const sendProposalRoutes = require('./routes/send_proposal');
 const messagesRoutes     = require('./routes/messages');
 const eventsRoutes       = require('./routes/events');
 
-const app  = express();
+const app        = express();
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: true, methods: ['GET', 'POST'], credentials: true },
+});
+io.use((socket, next) => {
+  const token = socket.handshake.auth && socket.handshake.auth.token;
+  if (!token) return next(new Error('unauthorized'));
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    socket.userId = payload.id;
+    next();
+  } catch {
+    next(new Error('unauthorized'));
+  }
+});
+io.on('connection', (socket) => {
+  socket.join('user:' + socket.userId);
+});
+realtime.init(io);
+
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
@@ -72,7 +96,7 @@ app.use((err, req, res, next) => {
 });
 
 init().then(seed).then(() => {
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`\nMyGUIg backend rodando em http://localhost:${PORT}`);
   });
 }).catch(err => {
