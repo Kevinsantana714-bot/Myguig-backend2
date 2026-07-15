@@ -50,7 +50,7 @@ router.get('/conversations', requireAuth, async (req, res) => {
     );
 
     const data = await Promise.all(convs.map(async (c) => {
-      const { rows: [other] }   = await pool.query('SELECT id, name FROM users WHERE id = $1', [c.other_id]);
+      const { rows: [other] }   = await pool.query('SELECT id, name, avatar_url FROM users WHERE id = $1', [c.other_id]);
       const { rows: [lastMsg] } = await pool.query(
         'SELECT body, created_at FROM messages WHERE conversation_id = $1 ORDER BY id DESC LIMIT 1',
         [c.id]
@@ -62,7 +62,7 @@ router.get('/conversations', requireAuth, async (req, res) => {
 
       return {
         id:              c.id,
-        other_user:      other ? { id: other.id, name: other.name } : null,
+        other_user:      other ? { id: other.id, name: other.name, avatar_url: other.avatar_url || null } : null,
         proposal_id:     c.proposal_id || null,
         last_message:    lastMsg ? lastMsg.body : null,
         last_message_at: lastMsg ? lastMsg.created_at : c.created_at,
