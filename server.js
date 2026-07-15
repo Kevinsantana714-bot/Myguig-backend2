@@ -42,6 +42,15 @@ realtime.init(io);
 
 const PORT = process.env.PORT || 3000;
 
+// Nunca deixar nenhuma resposta da API ficar em cache — nem no navegador, nem em
+// qualquer proxy/CDN pelo meio. Isto é uma API autenticada, cada pedido deve ser
+// sempre respondido com dados frescos daquele token específico.
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  next();
+});
+
 app.use(cors({
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
