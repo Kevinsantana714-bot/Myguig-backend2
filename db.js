@@ -92,6 +92,8 @@ async function init() {
   await pool.query(`UPDATE proposals SET status = 'confirmed' WHERE status = 'accepted'`);
   // Painel de admin
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE`);
+  // Eliminação de conta (soft-delete: anonimiza em vez de apagar, para não partir histórico de outras pessoas)
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
 
   // Eventos manuais da agenda (sincronizados entre dispositivos)
   await pool.query(`

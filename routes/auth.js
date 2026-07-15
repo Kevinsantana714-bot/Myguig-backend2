@@ -49,6 +49,7 @@ router.post('/login', async (req, res) => {
 
     const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email.trim().toLowerCase()]);
     const row   = rows[0];
+    if (row && row.deleted_at) return res.status(401).json({ error: 'Credenciais inválidas.' });
     const valid = row && await bcrypt.compare(password, row.password_hash);
     if (!valid) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
@@ -247,6 +248,62 @@ router.post('/reset-password', async (req, res) => {
     res.json({ message: 'Senha alterada com sucesso.' });
   } catch (e) {
     console.error('[reset-password]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /auth/change-password
+router.put('/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ error: 'Preenche a senha atual e a nova senha.' });
+    if (newPassword.length < 8)
+      return res.status(400).json({ error: 'A nova senha deve ter no mínimo 8 caracteres.' });
+
+    const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.userId]);
+    const row = rows[0];
+    if (!row || !row.password_hash)
+      return res.status(400).json({ error: 'Esta conta não tem senha definida (entraste por Google).' });
+
+    const valid = await bcrypt.compare(currentPassword, row.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Senha atual incorreta.' });
+
+    const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.userId]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /auth/account — soft-delete: anonimiza os dados pessoais, mantém a linha para não
+// partir propostas/mensagens já trocadas com outras pessoas.
+router.delete('/account', requireAuth, async (req, res) => {
+  try {
+    const uid = req.userId;
+    const anonEmail = `deleted_${uid}_${Date.now()}@myguig.invalid`;
+    await pool.query(
+      `UPDATE users SET
+         name = 'Utilizador eliminado',
+         email = $1,
+         password_hash = NULL,
+         bio = NULL,
+         estilos = '[]',
+         instagram = NULL,
+         cache_minimo = 0,
+         cidade = NULL,
+         avatar_url = NULL,
+         cover_url = NULL,
+         phone = NULL,
+         google_id = NULL,
+         is_admin = FALSE,
+         deleted_at = NOW()
+       WHERE id = $2`,
+      [anonEmail, uid]
+    );
+    res.json({ ok: true });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
