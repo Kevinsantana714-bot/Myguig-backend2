@@ -16,9 +16,11 @@ function makeToken(user) {
 // POST /auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body || {};
+    const { name, email, password, role, cidade } = req.body || {};
     if (!name || !email || !password)
       return res.status(400).json({ error: 'name, email e password são obrigatórios.' });
+    if (!cidade || !cidade.trim())
+      return res.status(400).json({ error: 'Indica a tua cidade.' });
     if (password.length < 6)
       return res.status(400).json({ error: 'Senha deve ter ao menos 6 caracteres.' });
 
@@ -30,11 +32,11 @@ router.post('/register', async (req, res) => {
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
     const { rows: [created] } = await pool.query(
-      'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
-      [name.trim(), email.trim().toLowerCase(), password_hash, userRole]
+      'INSERT INTO users (name, email, password_hash, role, cidade) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, cidade',
+      [name.trim(), email.trim().toLowerCase(), password_hash, userRole, cidade.trim()]
     );
 
-    res.status(201).json({ token: makeToken(created), user: { id: created.id, name: created.name, email: created.email, role: created.role } });
+    res.status(201).json({ token: makeToken(created), user: { id: created.id, name: created.name, email: created.email, role: created.role, cidade: created.cidade } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
