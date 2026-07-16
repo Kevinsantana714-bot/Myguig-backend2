@@ -171,7 +171,21 @@ router.patch('/:id/accept', requireAuth, async (req, res) => {
     );
     if (!prop) return res.status(404).json({ error: 'Proposta não encontrada.' });
 
-    await pool.query("UPDATE proposals SET status = 'confirmed', updated_at = NOW() WHERE id = $1", [id]);
+    // Se existir uma contraproposta, os valores dela tornam-se os valores finais ao aceitar
+    const { rows: [lastCounter] } = await pool.query(
+      'SELECT novo_cache, novo_horario FROM counters WHERE proposal_id = $1 ORDER BY id DESC LIMIT 1',
+      [id]
+    );
+
+    await pool.query(
+      `UPDATE proposals SET
+         status = 'confirmed',
+         cache = COALESCE($2, cache),
+         horario_inicio = COALESCE($3, horario_inicio),
+         updated_at = NOW()
+       WHERE id = $1`,
+      [id, lastCounter ? lastCounter.novo_cache : null, lastCounter ? lastCounter.novo_horario : null]
+    );
 
     // Notificar o outro participante
     const otherId = uid === prop.musician_id ? prop.contractor_id : prop.musician_id;
