@@ -90,6 +90,43 @@ async function init() {
   await pool.query(`UPDATE users SET onboarding_complete = TRUE WHERE password_hash IS NOT NULL AND onboarding_complete = FALSE`);
   // Corrige dados legados: propostas antigas gravadas como 'accepted' antes da renomeação para 'confirmed'
   await pool.query(`UPDATE proposals SET status = 'confirmed' WHERE status = 'accepted'`);
+  // Junta conversas duplicadas entre as mesmas duas pessoas (mensagens migram para a mais antiga)
+  await pool.query(`
+    WITH dup_groups AS (
+      SELECT LEAST(user_a_id,user_b_id) AS a, GREATEST(user_a_id,user_b_id) AS b,
+             MIN(id) AS keep_id
+      FROM conversations
+      GROUP BY 1,2
+      HAVING COUNT(*) > 1
+    ),
+    dup_convs AS (
+      SELECT c.id AS dup_id, g.keep_id
+      FROM conversations c
+      JOIN dup_groups g
+        ON LEAST(c.user_a_id,c.user_b_id) = g.a AND GREATEST(c.user_a_id,c.user_b_id) = g.b
+      WHERE c.id <> g.keep_id
+    )
+    UPDATE messages m SET conversation_id = d.keep_id
+    FROM dup_convs d
+    WHERE m.conversation_id = d.dup_id;
+  `);
+  await pool.query(`
+    WITH dup_groups AS (
+      SELECT LEAST(user_a_id,user_b_id) AS a, GREATEST(user_a_id,user_b_id) AS b,
+             MIN(id) AS keep_id
+      FROM conversations
+      GROUP BY 1,2
+      HAVING COUNT(*) > 1
+    ),
+    dup_convs AS (
+      SELECT c.id AS dup_id
+      FROM conversations c
+      JOIN dup_groups g
+        ON LEAST(c.user_a_id,c.user_b_id) = g.a AND GREATEST(c.user_a_id,c.user_b_id) = g.b
+      WHERE c.id <> g.keep_id
+    )
+    DELETE FROM conversations WHERE id IN (SELECT dup_id FROM dup_convs);
+  `);
   // Painel de admin
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE`);
   // Eliminação de conta (soft-delete: anonimiza em vez de apagar, para não partir histórico de outras pessoas)
